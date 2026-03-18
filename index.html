@@ -48,6 +48,22 @@
   </style>
 </head>
 <body>
+
+  <!-- hidden iframe รับ response จาก Apps Script (ไม่แสดงผล) -->
+  <iframe id="hidden-frame" name="hidden-frame" style="display:none;"></iframe>
+
+  <!-- hidden form ส่งข้อมูลผ่าน GET ไป Apps Script -->
+  <form id="data-form"
+        method="GET"
+        target="hidden-frame"
+        style="display:none;">
+    <input type="hidden" id="f-status" name="status">
+    <input type="hidden" id="f-name"   name="name">
+    <input type="hidden" id="f-userId" name="userId">
+    <input type="hidden" id="f-lat"    name="lat">
+    <input type="hidden" id="f-lng"    name="lng">
+  </form>
+
   <div class="card">
     <h2 id="user-greet">STC Check-in</h2>
     <button id="btn-in"  class="btn btn-in"  onclick="saveData('เข้างาน')" disabled>📍 ลงเวลาเข้างาน</button>
@@ -96,17 +112,20 @@
       }
     }
 
-    function sendToSheet(params) {
-      return new Promise(function(resolve) {
-        var url = BACKEND_URL + "?" + params.toString();
+    function submitForm(type, lat, lng) {
+      // ตั้งค่า action ของ form
+      var form = document.getElementById('data-form');
+      form.action = BACKEND_URL;
 
-        var img = new Image();
-        img.onload  = function() { resolve("success"); };
-        img.onerror = function() { resolve("success"); };
-        img.src = url;
+      // ใส่ข้อมูลลงใน hidden inputs
+      document.getElementById('f-status').value = type;
+      document.getElementById('f-name').value   = userProfile.displayName;
+      document.getElementById('f-userId').value = userProfile.userId;
+      document.getElementById('f-lat').value    = lat;
+      document.getElementById('f-lng').value    = lng;
 
-        setTimeout(function() { resolve("success"); }, 4000);
-      });
+      // submit ผ่าน hidden iframe — ไม่กระทบหน้าเว็บเลย
+      form.submit();
     }
 
     function saveData(type) {
@@ -119,21 +138,16 @@
       setStatus("📡 กำลังตรวจสอบพิกัด GPS...");
 
       navigator.geolocation.getCurrentPosition(
-        async function(pos) {
+        function(pos) {
           setStatus("💾 กำลังบันทึกข้อมูล...");
 
-          var params = new URLSearchParams({
-            status: type,
-            name:   userProfile.displayName,
-            userId: userProfile.userId,
-            lat:    pos.coords.latitude,
-            lng:    pos.coords.longitude
-          });
+          submitForm(type, pos.coords.latitude, pos.coords.longitude);
 
-          await sendToSheet(params);
-
-          setStatus("<b style='color:green'>✅ บันทึกสำเร็จ! กำลังปิดหน้าต่าง...</b>");
-          setTimeout(function() { liff.closeWindow(); }, 2000);
+          // รอ 3 วินาที แล้วแสดงผลสำเร็จ
+          setTimeout(function() {
+            setStatus("<b style='color:green'>✅ บันทึกสำเร็จ! กำลังปิดหน้าต่าง...</b>");
+            setTimeout(function() { liff.closeWindow(); }, 2000);
+          }, 3000);
         },
         function(err) {
           setStatus("<span style='color:red'>❌ GPS Error: " + err.message + "<br>กรุณาเปิด GPS ในมือถือก่อนครับ</span>");
