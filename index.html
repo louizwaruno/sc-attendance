@@ -57,7 +57,7 @@
 
   <script>
     var LIFF_ID     = "2009523027-LK7qvomM";
-    var BACKEND_URL = "https://script.google.com/macros/s/AKfycbxlNJbddADBkW2ra4jb6BywSFSGVYl7DhUVzeb2bOhwSBnOxVF-Xtjple89v2IWklyz/exec";
+    var BACKEND_URL = "https://script.google.com/macros/s/AKfycbxlNJbddADBkW2ra4jb6BywSFSGVYl7DhUVzeb2bOhwSBnOxVF-Xtjple89v2IWkIyz/exec";
 
     var userProfile = null;
 
@@ -99,14 +99,12 @@
     function sendToSheet(params) {
       return new Promise(function(resolve) {
         var url = BACKEND_URL + "?" + params.toString();
-        
-        // ใช้ Image trick — ไม่มีปัญหา CORS และตาม redirect ได้
+
         var img = new Image();
         img.onload  = function() { resolve("success"); };
-        img.onerror = function() { resolve("success"); }; // error = redirect เกิดขึ้น = ข้อมูลถูกส่งแล้ว
+        img.onerror = function() { resolve("success"); };
         img.src = url;
 
-        // รอ 4 วินาที แล้วถือว่าสำเร็จ
         setTimeout(function() { resolve("success"); }, 4000);
       });
     }
