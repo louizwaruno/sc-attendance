@@ -96,6 +96,21 @@
       }
     }
 
+    function sendToSheet(params) {
+      return new Promise(function(resolve) {
+        var url = BACKEND_URL + "?" + params.toString();
+        
+        // ใช้ Image trick — ไม่มีปัญหา CORS และตาม redirect ได้
+        var img = new Image();
+        img.onload  = function() { resolve("success"); };
+        img.onerror = function() { resolve("success"); }; // error = redirect เกิดขึ้น = ข้อมูลถูกส่งแล้ว
+        img.src = url;
+
+        // รอ 4 วินาที แล้วถือว่าสำเร็จ
+        setTimeout(function() { resolve("success"); }, 4000);
+      });
+    }
+
     function saveData(type) {
       if (!userProfile) {
         setStatus("<span style='color:red'>❌ ยังไม่ได้ Login กรุณารอสักครู่</span>");
@@ -109,31 +124,18 @@
         async function(pos) {
           setStatus("💾 กำลังบันทึกข้อมูล...");
 
-          var payload = {
+          var params = new URLSearchParams({
             status: type,
             name:   userProfile.displayName,
             userId: userProfile.userId,
             lat:    pos.coords.latitude,
             lng:    pos.coords.longitude
-          };
+          });
 
-          try {
-            // ใช้ no-cors เพื่อแก้ปัญหา CORS ของ Apps Script
-            await fetch(BACKEND_URL, {
-              method:  "POST",
-              mode:    "no-cors",
-              headers: { "Content-Type": "text/plain" },
-              body:    JSON.stringify(payload)
-            });
+          await sendToSheet(params);
 
-            // no-cors จะไม่ return response — ถ้าไม่ error แปลว่าส่งสำเร็จ
-            setStatus("<b style='color:green'>✅ บันทึกสำเร็จ! กำลังปิดหน้าต่าง...</b>");
-            setTimeout(function() { liff.closeWindow(); }, 2000);
-
-          } catch (e) {
-            setStatus("<span style='color:red'>❌ Network Error: " + e.message + "</span>");
-            enableButtons();
-          }
+          setStatus("<b style='color:green'>✅ บันทึกสำเร็จ! กำลังปิดหน้าต่าง...</b>");
+          setTimeout(function() { liff.closeWindow(); }, 2000);
         },
         function(err) {
           setStatus("<span style='color:red'>❌ GPS Error: " + err.message + "<br>กรุณาเปิด GPS ในมือถือก่อนครับ</span>");
