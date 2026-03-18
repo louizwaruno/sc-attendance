@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STC Check-in</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      width: 85%;
+      text-align: center;
+    }
+    .btn {
+      width: 100%;
+      padding: 15px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      color: white;
+      transition: 0.3s;
+    }
+    .btn-in           { background: #28a745; }
+    .btn-in:disabled  { background: #28a745; opacity: 0.45; cursor: not-allowed; }
+    .btn-out          { background: #dc3545; }
+    .btn-out:disabled { background: #dc3545; opacity: 0.45; cursor: not-allowed; }
+    #status {
+      margin-top: 20px;
+      color: #666;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2 id="user-greet">STC Check-in</h2>
+    <button id="btn-in"  class="btn btn-in"  onclick="saveData('เข้างาน')" disabled>📍 ลงเวลาเข้างาน</button>
+    <button id="btn-out" class="btn btn-out" onclick="saveData('ออกงาน')" disabled>🕒 ลงเวลาออกงาน</button>
+    <div id="status">⏳ กำลังเริ่มต้นระบบ...</div>
+  </div>
+
+  <script>
+    // ====== ตั้งค่าหลัก ======
+    var LIFF_ID      = "2009523027-LK7qvomM";
+    var BACKEND_URL  = "https://script.google.com/macros/s/AKfycbxlNJbddADBkW2ra4jb6BywSFSGVYl7DhUVzeb2bOhwSBnOxVF-Xtjple89v2IWklyz/exec";
+    // =========================
+
+    var userProfile = null;
+
+    function setStatus(msg) {
+      document.getElementById('status').innerHTML = msg;
+    }
+
+    function enableButtons() {
+      document.getElementById('btn-in').disabled  = false;
+      document.getElementById('btn-out').disabled = false;
+    }
+
+    function disableButtons() {
+      document.getElementById('btn-in').disabled  = true;
+      document.getElementById('btn-out').disabled = true;
+    }
+
+    async function main() {
+      try {
+        setStatus("⏳ กำลังเชื่อมต่อ LINE...");
+        await liff.init({ liffId: LIFF_ID });
+
+        if (!liff.isLoggedIn()) {
+          setStatus("🔐 กำลัง Login LINE...");
+          liff.login();
+          return;
+        }
+
+        setStatus("👤 กำลังดึงข้อมูลผู้ใช้...");
+        userProfile = await liff.getProfile();
+
+        document.getElementById('user-greet').innerText = "สวัสดีคุณ " + userProfile.displayName;
+        setStatus("✅ พร้อมบันทึกพิกัด GPS แล้วครับ");
+        enableButtons();
+
+      } catch (err) {
+        setStatus("<span style='color:red'>❌ LIFF Error: " + err.message + "</span>");
+      }
+    }
+
+    function saveData(type) {
+      if (!userProfile) {
+        setStatus("<span style='color:red'>❌ ยังไม่ได้ Login กรุณารอสักครู่</span>");
+        return;
+      }
+
+      disableButtons();
+      setStatus("📡 กำลังตรวจสอบพิกัด GPS...");
+
+      navigator.geolocation.getCurrentPosition(
+        async function(pos) {
+          setStatus("💾 กำลังบันทึกข้อมูล...");
+
+          var payload = {
+            status: type,
+            name:   userProfile.displayName,
+            userId: userProfile.userId,
+            lat:    pos.coords.latitude,
+            lng:    pos.coords.longitude
+          };
+
+          try {
+            // ส่งข้อมูลไป Apps Script โดยตรง (ไม่ผ่าน google.script.run)
+            var response = await fetch(BACKEND_URL, {
+              method: "POST",
+              body: JSON.stringify(payload)
+            });
+            var result = await response.json();
+
+            if (result.result === "success") {
+              setStatus("<b style='color:green'>✅ บันทึกสำเร็จ! กำลังปิดหน้าต่าง...</b>");
+              setTimeout(function() { liff.closeWindow(); }, 2000);
+            } else {
+              setStatus("<span style='color:red'>❌ บันทึกไม่สำเร็จ กรุณาลองใหม่</span>");
+              enableButtons();
+            }
+          } catch (e) {
+            setStatus("<span style='color:red'>❌ Network Error: " + e.message + "</span>");
+            enableButtons();
+          }
+        },
+        function(err) {
+          setStatus("<span style='color:red'>❌ GPS Error: " + err.message + "<br>กรุณาเปิด GPS ในมือถือก่อนครับ</span>");
+          enableButtons();
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    main();
+  </script>
+</body>
+</html>
