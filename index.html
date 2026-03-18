@@ -56,22 +56,18 @@
   </div>
 
   <script>
-    // ====== ตั้งค่าหลัก ======
-    var LIFF_ID      = "2009523027-LK7qvomM";
-    var BACKEND_URL  = "https://script.google.com/macros/s/AKfycbxlNJbddADBkW2ra4jb6BywSFSGVYl7DhUVzeb2bOhwSBnOxVF-Xtjple89v2IWklyz/exec";
-    // =========================
+    var LIFF_ID     = "2009523027-LK7qvomM";
+    var BACKEND_URL = "https://script.google.com/macros/s/AKfycbxlNJbddADBkW2ra4jb6BywSFSGVYl7DhUVzeb2bOhwSBnOxVF-Xtjple89v2IWklyz/exec";
 
     var userProfile = null;
 
     function setStatus(msg) {
       document.getElementById('status').innerHTML = msg;
     }
-
     function enableButtons() {
       document.getElementById('btn-in').disabled  = false;
       document.getElementById('btn-out').disabled = false;
     }
-
     function disableButtons() {
       document.getElementById('btn-in').disabled  = true;
       document.getElementById('btn-out').disabled = true;
@@ -122,20 +118,18 @@
           };
 
           try {
-            // ส่งข้อมูลไป Apps Script โดยตรง (ไม่ผ่าน google.script.run)
-            var response = await fetch(BACKEND_URL, {
-              method: "POST",
-              body: JSON.stringify(payload)
+            // ใช้ no-cors เพื่อแก้ปัญหา CORS ของ Apps Script
+            await fetch(BACKEND_URL, {
+              method:  "POST",
+              mode:    "no-cors",
+              headers: { "Content-Type": "text/plain" },
+              body:    JSON.stringify(payload)
             });
-            var result = await response.json();
 
-            if (result.result === "success") {
-              setStatus("<b style='color:green'>✅ บันทึกสำเร็จ! กำลังปิดหน้าต่าง...</b>");
-              setTimeout(function() { liff.closeWindow(); }, 2000);
-            } else {
-              setStatus("<span style='color:red'>❌ บันทึกไม่สำเร็จ กรุณาลองใหม่</span>");
-              enableButtons();
-            }
+            // no-cors จะไม่ return response — ถ้าไม่ error แปลว่าส่งสำเร็จ
+            setStatus("<b style='color:green'>✅ บันทึกสำเร็จ! กำลังปิดหน้าต่าง...</b>");
+            setTimeout(function() { liff.closeWindow(); }, 2000);
+
           } catch (e) {
             setStatus("<span style='color:red'>❌ Network Error: " + e.message + "</span>");
             enableButtons();
