@@ -43,27 +43,11 @@
       margin-top: 20px;
       color: #666;
       font-size: 14px;
-      line-height: 1.6;
+      line-height: 1.8;
     }
   </style>
 </head>
 <body>
-
-  <!-- hidden iframe รับ response จาก Apps Script (ไม่แสดงผล) -->
-  <iframe id="hidden-frame" name="hidden-frame" style="display:none;"></iframe>
-
-  <!-- hidden form ส่งข้อมูลผ่าน GET ไป Apps Script -->
-  <form id="data-form"
-        method="GET"
-        target="hidden-frame"
-        style="display:none;">
-    <input type="hidden" id="f-status" name="status">
-    <input type="hidden" id="f-name"   name="name">
-    <input type="hidden" id="f-userId" name="userId">
-    <input type="hidden" id="f-lat"    name="lat">
-    <input type="hidden" id="f-lng"    name="lng">
-  </form>
-
   <div class="card">
     <h2 id="user-greet">STC Check-in</h2>
     <button id="btn-in"  class="btn btn-in"  onclick="saveData('เข้างาน')" disabled>📍 ลงเวลาเข้างาน</button>
@@ -72,8 +56,15 @@
   </div>
 
   <script>
+    // ====== ตั้งค่าหลัก ======
     var LIFF_ID     = "2009523027-LK7qvomM";
     var BACKEND_URL = "https://script.google.com/macros/s/AKfycbxlNJbddADBkW2ra4jb6BywSFSGVYl7DhUVzeb2bOhwSBnOxVF-Xtjple89v2IWkIyz/exec";
+
+    // พิกัดศูนย์กลางวิทยาลัย
+    var OFFICE_LAT = 13.712741951741547;
+    var OFFICE_LNG = 100.26133286736531;
+    var ALLOWED_RADIUS_METERS = 200; // รัศมีที่อนุญาต
+    // =========================
 
     var userProfile = null;
 
@@ -87,6 +78,18 @@
     function disableButtons() {
       document.getElementById('btn-in').disabled  = true;
       document.getElementById('btn-out').disabled = true;
+    }
+
+    // คำนวณระยะห่างระหว่างสองพิกัด (เมตร) — Haversine Formula
+    function getDistanceMeters(lat1, lng1, lat2, lng2) {
+      var R = 6371000; // รัศมีโลก (เมตร)
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLng = (lng2 - lng1) * Math.PI / 180;
+      var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
     }
 
     async function main() {
@@ -113,18 +116,13 @@
     }
 
     function submitForm(type, lat, lng) {
-      // ตั้งค่า action ของ form
       var form = document.getElementById('data-form');
       form.action = BACKEND_URL;
-
-      // ใส่ข้อมูลลงใน hidden inputs
       document.getElementById('f-status').value = type;
       document.getElementById('f-name').value   = userProfile.displayName;
       document.getElementById('f-userId').value = userProfile.userId;
       document.getElementById('f-lat').value    = lat;
       document.getElementById('f-lng').value    = lng;
-
-      // submit ผ่าน hidden iframe — ไม่กระทบหน้าเว็บเลย
       form.submit();
     }
 
@@ -139,11 +137,28 @@
 
       navigator.geolocation.getCurrentPosition(
         function(pos) {
-          setStatus("💾 กำลังบันทึกข้อมูล...");
+          var lat = pos.coords.latitude;
+          var lng = pos.coords.longitude;
 
-          submitForm(type, pos.coords.latitude, pos.coords.longitude);
+          // ตรวจสอบระยะห่างจากวิทยาลัย
+          var distance = getDistanceMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
+          var distanceRounded = Math.round(distance);
 
-          // รอ 3 วินาที แล้วแสดงผลสำเร็จ
+          if (distance > ALLOWED_RADIUS_METERS) {
+            // อยู่นอกรัศมี — ห้ามบันทึก
+            setStatus(
+              "<span style='color:red; font-size:18px;'>⛔ อยู่นอกรัศมีทำการ</span><br>" +
+              "<span style='color:#888'>ระยะห่างจากวิทยาลัย: <b>" + distanceRounded + " เมตร</b><br>" +
+              "รัศมีที่อนุญาต: " + ALLOWED_RADIUS_METERS + " เมตร</span>"
+            );
+            enableButtons();
+            return;
+          }
+
+          // อยู่ในรัศมี — บันทึกได้
+          setStatus("💾 กำลังบันทึกข้อมูล...<br><small>ระยะห่าง " + distanceRounded + " เมตร ✅</small>");
+          submitForm(type, lat, lng);
+
           setTimeout(function() {
             setStatus("<b style='color:green'>✅ บันทึกสำเร็จ! กำลังปิดหน้าต่าง...</b>");
             setTimeout(function() { liff.closeWindow(); }, 2000);
@@ -159,5 +174,15 @@
 
     main();
   </script>
+
+  <!-- Hidden form สำหรับส่งข้อมูล -->
+  <iframe id="hidden-frame" name="hidden-frame" style="display:none;"></iframe>
+  <form id="data-form" method="GET" target="hidden-frame" style="display:none;">
+    <input type="hidden" id="f-status" name="status">
+    <input type="hidden" id="f-name"   name="name">
+    <input type="hidden" id="f-userId" name="userId">
+    <input type="hidden" id="f-lat"    name="lat">
+    <input type="hidden" id="f-lng"    name="lng">
+  </form>
 </body>
 </html>
