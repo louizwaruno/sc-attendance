@@ -56,15 +56,12 @@
   </div>
 
   <script>
-    // ====== ตั้งค่าหลัก ======
     var LIFF_ID     = "2009523027-LK7qvomM";
     var BACKEND_URL = "https://script.google.com/macros/s/AKfycbxlNJbddADBkW2ra4jb6BywSFSGVYl7DhUVzeb2bOhwSBnOxVF-Xtjple89v2IWkIyz/exec";
 
-    // พิกัดศูนย์กลางวิทยาลัย
     var OFFICE_LAT = 13.712741951741547;
     var OFFICE_LNG = 100.26133286736531;
-    var ALLOWED_RADIUS_METERS = 200; // รัศมีที่อนุญาต
-    // =========================
+    var ALLOWED_RADIUS_METERS = 100; // ✅ เปลี่ยนเป็น 100 เมตร
 
     var userProfile = null;
 
@@ -80,36 +77,30 @@
       document.getElementById('btn-out').disabled = true;
     }
 
-    // คำนวณระยะห่างระหว่างสองพิกัด (เมตร) — Haversine Formula
     function getDistanceMeters(lat1, lng1, lat2, lng2) {
-      var R = 6371000; // รัศมีโลก (เมตร)
+      var R = 6371000;
       var dLat = (lat2 - lat1) * Math.PI / 180;
       var dLng = (lng2 - lng1) * Math.PI / 180;
       var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
               Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
               Math.sin(dLng/2) * Math.sin(dLng/2);
-      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
     async function main() {
       try {
         setStatus("⏳ กำลังเชื่อมต่อ LINE...");
         await liff.init({ liffId: LIFF_ID });
-
         if (!liff.isLoggedIn()) {
           setStatus("🔐 กำลัง Login LINE...");
           liff.login();
           return;
         }
-
         setStatus("👤 กำลังดึงข้อมูลผู้ใช้...");
         userProfile = await liff.getProfile();
-
         document.getElementById('user-greet').innerText = "สวัสดีคุณ " + userProfile.displayName;
         setStatus("✅ พร้อมบันทึกพิกัด GPS แล้วครับ");
         enableButtons();
-
       } catch (err) {
         setStatus("<span style='color:red'>❌ LIFF Error: " + err.message + "</span>");
       }
@@ -131,7 +122,6 @@
         setStatus("<span style='color:red'>❌ ยังไม่ได้ Login กรุณารอสักครู่</span>");
         return;
       }
-
       disableButtons();
       setStatus("📡 กำลังตรวจสอบพิกัด GPS...");
 
@@ -139,24 +129,19 @@
         function(pos) {
           var lat = pos.coords.latitude;
           var lng = pos.coords.longitude;
-
-          // ตรวจสอบระยะห่างจากวิทยาลัย
-          var distance = getDistanceMeters(lat, lng, OFFICE_LAT, OFFICE_LNG);
-          var distanceRounded = Math.round(distance);
+          var distance = Math.round(getDistanceMeters(lat, lng, OFFICE_LAT, OFFICE_LNG));
 
           if (distance > ALLOWED_RADIUS_METERS) {
-            // อยู่นอกรัศมี — ห้ามบันทึก
             setStatus(
               "<span style='color:red; font-size:18px;'>⛔ อยู่นอกรัศมีทำการ</span><br>" +
-              "<span style='color:#888'>ระยะห่างจากวิทยาลัย: <b>" + distanceRounded + " เมตร</b><br>" +
+              "<span style='color:#888'>ระยะห่างจากวิทยาลัย: <b>" + distance + " เมตร</b><br>" +
               "รัศมีที่อนุญาต: " + ALLOWED_RADIUS_METERS + " เมตร</span>"
             );
             enableButtons();
             return;
           }
 
-          // อยู่ในรัศมี — บันทึกได้
-          setStatus("💾 กำลังบันทึกข้อมูล...<br><small>ระยะห่าง " + distanceRounded + " เมตร ✅</small>");
+          setStatus("💾 กำลังบันทึกข้อมูล...<br><small>ระยะห่าง " + distance + " เมตร ✅</small>");
           submitForm(type, lat, lng);
 
           setTimeout(function() {
@@ -175,7 +160,6 @@
     main();
   </script>
 
-  <!-- Hidden form สำหรับส่งข้อมูล -->
   <iframe id="hidden-frame" name="hidden-frame" style="display:none;"></iframe>
   <form id="data-form" method="GET" target="hidden-frame" style="display:none;">
     <input type="hidden" id="f-status" name="status">
